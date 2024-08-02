@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from __future__ import division, print_function, absolute_import, unicode_literals
-from builtins import int, open
+from builtins import open
 from future import standard_library
 
 standard_library.install_aliases()

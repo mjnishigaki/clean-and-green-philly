@@ -1,28 +1,23 @@
+# classes/diff_report.py
 import logging as log
-import os
 import re
-import smtplib
 import subprocess
-from email.mime.text import MIMEText
 
 from classes.backup_archive_database import backup_schema_name
 from classes.featurelayer import google_cloud_bucket
 from config.config import (
-    from_email,
     log_level,
-    report_to_email,
-    report_to_slack_channel,
-    smtp_server,
 )
 from config.psql import conn, url
 from data_utils.utils import mask_password
-from slack_sdk import WebClient
+from classes.report_utils import send_report_to_slack, email_report
 
 log.basicConfig(level=log_level)
 
+
 class DiffTable:
-    """Metadata about a table to be run through data-diff
-    """    
+    """Metadata about a table to be run through data-diff"""
+
     def __init__(self, table: str, pk_cols: list[str], where: str = None):
         """constructor
 
@@ -34,6 +29,7 @@ class DiffTable:
         self.table = table
         self.pk_cols = pk_cols
         self.where = where
+
 
 class DiffReport:
     """
@@ -48,7 +44,11 @@ class DiffReport:
         """
         self.diff_tables = self._list_diff_tables()
         self.timestamp_string = timestamp_string
-        self.report: str = "The back-end data has been fully refreshed.  Here is the difference report on " + str(len(self.diff_tables)) + " key tables.\nLegend: table A = new data, table B = old data.\n\n"
+        self.report: str = (
+            "The back-end data has been fully refreshed.  Here is the difference report on "
+            + str(len(self.diff_tables))
+            + " key tables.\nLegend: table A = new data, table B = old data.\n\n"
+        )
 
     def run(self):
         """
@@ -56,7 +56,11 @@ class DiffReport:
         """
 
         for diff_table in self.diff_tables:
-            log.debug("Process table %s with pks %s", diff_table.table, str(diff_table.pk_cols))
+            log.debug(
+                "Process table %s with pks %s",
+                diff_table.table,
+                str(diff_table.pk_cols),
+            )
             summary = diff_table.table + "\n" + self.compare_table(diff_table)
             # if no differences, do not report.
             if self._summary_shows_differences(summary):
@@ -141,11 +145,23 @@ class DiffReport:
             list[DiffTable]: the list of metadata
         """
         return [
-            DiffTable(table="vacant_properties",pk_cols=["opa_id", "parcel_type"],where="opa_id is not null"),
-            DiffTable(table="li_complaints",pk_cols=["service_request_id"]),
-            DiffTable(table="li_violations",pk_cols=["violationnumber", "opa_account_num"],where="opa_account_num is not null"),
-            DiffTable(table="opa_properties",pk_cols=["parcel_number"]),
-            DiffTable(table="property_tax_delinquencies",pk_cols=["opa_number"],where="opa_number <> 0")
+            DiffTable(
+                table="vacant_properties",
+                pk_cols=["opa_id", "parcel_type"],
+                where="opa_id is not null",
+            ),
+            DiffTable(table="li_complaints", pk_cols=["service_request_id"]),
+            DiffTable(
+                table="li_violations",
+                pk_cols=["violationnumber", "opa_account_num"],
+                where="opa_account_num is not null",
+            ),
+            DiffTable(table="opa_properties", pk_cols=["parcel_number"]),
+            DiffTable(
+                table="property_tax_delinquencies",
+                pk_cols=["opa_number"],
+                where="opa_number <> 0",
+            ),
         ]
 
     def compare_table(self, diff_table: DiffTable) -> str:
@@ -193,33 +209,12 @@ class DiffReport:
 
     def send_report_to_slack(self):
         """
-        post the summary report to the slack channel if configured.
+        Post the summary report to the Slack channel if configured.
         """
-        if report_to_slack_channel:
-            token = os.environ["CAGP_SLACK_API_TOKEN"]
-            client = WebClient(token=token)
-
-            # Send a message
-            client.chat_postMessage(
-                channel=report_to_slack_channel,
-                text=self.report,
-                username="CAGP Diff Bot",
-            )
+        send_report_to_slack(self.report, "CAGP Diff Bot")
 
     def email_report(self):
         """
-        email the summary report if configured.
+        Email the summary report if configured.
         """
-        if report_to_email:
-            # Create a text/plain message
-            msg = MIMEText(self.report)
-            msg["Subject"] = "Clean & Green Philly: Data difference report"
-            msg["From"] = from_email
-            msg["To"] = report_to_email
-
-            # Send the message via our own SMTP server
-            s = smtplib.SMTP(smtp_server)
-            s.sendmail(from_email, [report_to_email], msg.as_string())
-            s.quit()
-
-
+        email_report(self.report, "Clean & Green Philly: Data difference report")

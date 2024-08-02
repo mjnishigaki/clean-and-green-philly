@@ -1,8 +1,8 @@
 import sys
 import time
-
 from classes.backup_archive_database import BackupArchiveDatabase
 from classes.diff_report import DiffReport
+from classes.vac_props_qc import VacPropsQC
 from config.psql import conn
 from data_utils.access_process import access_process
 from data_utils.city_owned_properties import city_owned_properties
@@ -68,18 +68,30 @@ if FORCE_RELOAD:
     if backup.is_backup_schema_exists():
         backup.archive_backup_schema()
         conn.commit()
-        time.sleep(1) # make sure we get a different timestamp
-        backup = BackupArchiveDatabase() # create a new one so we get a new timestamp
-    
+        time.sleep(1)  # make sure we get a different timestamp
+        backup = BackupArchiveDatabase()  # create a new one so we get a new timestamp
+
     backup.backup_schema()
     conn.commit()
 
 # Load Vacant Property Data
 dataset = vacant_properties()
 
+initial_dataset_size = len(dataset.gdf)
+
+print(f"Initial dataset size: {initial_dataset_size}")
+
+# Create an instance of VacPropsQC and check the size
+qc_checker = VacPropsQC(initial_dataset_size)
+
+try:
+    qc_checker.check_size()
+except ValueError:
+    sys.exit(1)
+
 # Load and join other datasets
 for service in services:
-   dataset = service(dataset)
+    dataset = service(dataset)
 
 # Add Priority Level
 dataset = priority_level(dataset)

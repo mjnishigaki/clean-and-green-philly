@@ -75,6 +75,7 @@ Please see the documents in our [docs](/docs) folder for background on the proje
 1. The [guide to contributing](/docs/CONTRIBUTING.md)
 2. The [code of conduct](/docs/CODE_OF_CONDUCT.md)
 3. The appropriate installation setup instructions ([front end](/docs/SETUP/FRONT_END.md) and/or [back end](/docs/SETUP/BACK_END.md))
+4. The one-pager for UX research and design.
 
 ### Point of Contact
 
